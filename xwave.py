@@ -6,11 +6,11 @@ import select
 import termios
 import tty
 
-# Color ANSI codes
 COLOR_CYAN = "\033[1;36m"
 COLOR_BLUE = "\033[0;34m"
 COLOR_MAGENTA = "\033[1;35m"
 COLOR_WHITE = "\033[1;37m"
+COLOR_GREEN = "\033[1;32m"
 COLOR_DIM = "\033[2;37m"
 COLOR_RESET = "\033[0m"
 
@@ -23,13 +23,13 @@ class RawTerminal:
         self.fd = sys.stdin.fileno()
         self.old_settings = termios.tcgetattr(self.fd)
         tty.setraw(self.fd)
-        sys.stdout.write("\033[?25l\033[2J") # Hide cursor, clear screen
+        sys.stdout.write("\033[?25l\033[2J")
         sys.stdout.flush()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         termios.tcsetattr(self.fd, termios.TCSADRAIN, self.old_settings)
-        sys.stdout.write("\033[?25h\033[0m\033[2J\033[1;1H") # Show cursor, reset
+        sys.stdout.write("\033[?25h\033[0m\033[2J\033[1;1H")
         sys.stdout.flush()
 
 def get_key():
@@ -49,15 +49,12 @@ def render_black_hole():
         center_y = rows // 2
         buffer = ["\033[2J"]
 
-        # Gravitational Lensing & Accretion Spiral
         for ring in range(3, 16):
             particle_count = ring * 6
-            speed_multiplier = 2.5 / (ring ** 0.5) # Keplerian velocity profile
+            speed_multiplier = 2.5 / (ring ** 0.5)
             
             for i in range(particle_count):
                 angle = (i / particle_count) * (2 * math.pi) + (frame * 0.08 * speed_multiplier)
-                
-                # Elliptical distortion simulating tilted accretion disk
                 x = int(center_x + math.cos(angle) * (ring * 2.2))
                 y = int(center_y + math.sin(angle) * (ring * 0.8))
 
@@ -66,19 +63,17 @@ def render_black_hole():
                     symbol = BH_PARTICLES[char_idx]
 
                     if ring <= 5:
-                        color = COLOR_MAGENTA # Hot inner region
+                        color = COLOR_MAGENTA
                     elif ring <= 10:
-                        color = COLOR_CYAN    # Mid disk
+                        color = COLOR_CYAN
                     else:
-                        color = COLOR_BLUE    # Fading outer edge
+                        color = COLOR_BLUE
 
                     buffer.append(f"\033[{y};{x}H{color}{symbol}")
 
-        # Singularity / Event Horizon Core
         core = "  (●)  "
         buffer.append(f"\033[{center_y};{center_x - 3}H{COLOR_WHITE}{core}{COLOR_RESET}")
 
-        # Text Overlay
         msg = "alone in the universe....."
         msg_x = max(1, (cols - len(msg)) // 2)
         msg_y = max(1, rows - 2)
@@ -91,8 +86,13 @@ def render_black_hole():
 
 def main():
     phase1, phase2, phase3 = 0.0, 0.0, 0.0
+    speed = 0.03
+    freq_mult = 1.0
     input_buffer = ""
-    trigger = "fee1 d3ad"
+    trigger_bh = "fee1 d3ad"
+    
+    color_scheme = 0
+    colors = [COLOR_CYAN, COLOR_MAGENTA, COLOR_GREEN, COLOR_WHITE]
 
     with RawTerminal():
         while True:
@@ -100,22 +100,30 @@ def main():
             if key:
                 if key in ['q', '\x1b']:
                     break
+                elif key == '+':
+                    speed = max(0.005, speed - 0.005) # Faster
+                elif key == '-':
+                    speed += 0.005                    # Slower
+                elif key == 'f':
+                    freq_mult = 2.0 if freq_mult == 1.0 else 1.0 # Toggle frequency
+                elif key == 'c':
+                    color_scheme = (color_scheme + 1) % len(colors) # Cycle colors
+                
                 input_buffer += key
                 if len(input_buffer) > 15:
                     input_buffer = input_buffer[-15:]
-                if trigger in input_buffer:
+                if trigger_bh in input_buffer:
                     input_buffer = ""
                     render_black_hole()
 
             cols, rows = os.get_terminal_size()
             center_y = rows / 2.0
             buffer = ["\033[2J"]
+            active_color = colors[color_scheme]
 
             for x in range(1, cols + 1):
-                x_f = float(x)
+                x_f = float(x) * freq_mult
 
-                # Wave Superposition Math Equation:
-                # y(x, t) = A1*sin(k1*x + w1*t) + A2*cos(k2*x - w2*t) + A3*sin(k3*x + w3*t)
                 y1 = center_y + (math.sin(x_f * 0.07 + phase1) * (center_y * 0.45)) + (math.cos(x_f * 0.03 + phase2) * (center_y * 0.2))
                 y2 = center_y + (math.cos(x_f * 0.11 - phase2) * (center_y * 0.3))
                 y3 = center_y + (math.sin(x_f * 0.04 + phase3) * (center_y * 0.6))
@@ -124,16 +132,17 @@ def main():
                 r2 = max(1, min(rows, int(y2)))
                 r3 = max(1, min(rows, int(y3)))
 
-                # Primary Deep Wave Layer
                 idx1 = int((y1 / rows) * len(CHARS_WAVE_PRIMARY)) % len(CHARS_WAVE_PRIMARY)
-                buffer.append(f"\033[{r1};{x}H{COLOR_CYAN}{CHARS_WAVE_PRIMARY[idx1]}")
+                buffer.append(f"\033[{r1};{x}H{active_color}{CHARS_WAVE_PRIMARY[idx1]}")
 
-                # Secondary Interference Layer
                 idx2 = int((y2 / rows) * len(CHARS_WAVE_SECONDARY)) % len(CHARS_WAVE_SECONDARY)
                 buffer.append(f"\033[{r2};{x}H{COLOR_BLUE}{CHARS_WAVE_SECONDARY[idx2]}")
 
-                # Crest Peak
                 buffer.append(f"\033[{r3};{x}H{COLOR_WHITE}█")
+
+            # HUD Instructions
+            hud = "[+] Speed Up | [-] Slow Down | [f] Freq | [c] Color | [q] Quit"
+            buffer.append(f"\033[1;1H{COLOR_DIM}{hud}{COLOR_RESET}")
 
             sys.stdout.write("".join(buffer))
             sys.stdout.flush()
@@ -141,7 +150,7 @@ def main():
             phase1 += 0.12
             phase2 += 0.07
             phase3 += 0.18
-            time.sleep(0.03)
+            time.sleep(speed)
 
 if __name__ == "__main__":
     main()
